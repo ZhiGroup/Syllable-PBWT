@@ -12,15 +12,15 @@ using namespace std;
 
 const unsigned long long MOD = (1ull << 63) - 25;
 
-int M, N, n, L_, L;
+int M, N, n, L, l;
 vector<vector<unsigned __int128>> x;
 vector<vector<unsigned long long>> h;
 vector<vector<int>> a, d, inv_a;
 vector<unsigned long long> xp = {1};
-vector<bool> z;
+vector<vector<bool>> z;
 
 int main(int argc, char** argv) {
-	string vcf = "/data6/ukbiobank/genotype_data/autosomal_chroms_june2018/21981/ukb_hap_GP_removed/ukb_hap_chr20_v2.vcf";
+	string vcf = "/data6/ukbiobank/genotype_data/autosomal_chroms_june2018/21981/ukb_hap_GP_removed/ukb_hap_chr21_v2.vcf";
 	ifstream in(vcf);
 	ios_base::sync_with_stdio(0); cin.tie(0);
 
@@ -32,10 +32,11 @@ int main(int argc, char** argv) {
 	M = -9;
 	while (getline(ss, line, '\t')) M++;
 	M <<= 1;
-	M--;
+	int Q = 10;
+	assert(Q % 2 == 0);
+	M -= Q;
 	N = 0, n = 0;
-	L_ = stoi(argv[1]), L = (L_ - 255) / 128 + 1;
-	assert(L_ >= 255);
+	L = stoi(argv[1]), assert(L >= 255), l = (L - 127) / 128;
 
 	h.push_back(vector<unsigned long long>(M));
 	a.push_back(vector<int>(M));
@@ -53,6 +54,7 @@ int main(int argc, char** argv) {
 				continue;
 			}
 
+			z.push_back(vector<bool>(Q));
 			if (N % 128 == 0) {
 				x.push_back(vector<unsigned __int128>(M + 1));
 				h.push_back(h[n]);
@@ -61,15 +63,18 @@ int main(int argc, char** argv) {
 			ss = stringstream(line);
 			for (int _ = 0; _ < 9; _++) getline(ss, line, '\t');
 			int i = 0;
-			while (getline(ss, line, '\t')) {
-				if (i == 0) {
-					z.push_back(line[0] != '0');
-				} else {
-					x[n][i] = (x[n][i] << 1) | (line[0] != '0');
-					h[np1][i] = (h[np1][i] << 1) | (line[0] != '0');
-					if (h[np1][i] >= MOD) h[np1][i] -= MOD;
-					i++;
-				}
+			while (i < Q) {
+				getline(ss, line, '\t');
+				z[N][i++] = line[0] != '0';
+				z[N][i++] = line[2] != '0';
+			}
+			i = 0;
+			while (i < M) {
+				getline(ss, line, '\t');
+				x[n][i] = (x[n][i] << 1) | (line[0] != '0');
+				h[np1][i] = (h[np1][i] << 1) | (line[0] != '0');
+				if (h[np1][i] >= MOD) h[np1][i] -= MOD;
+				i++;
 				x[n][i] = (x[n][i] << 1) | (line[2] != '0');
 				h[np1][i] = (h[np1][i] << 1) | (line[2] != '0');
 				if (h[np1][i] >= MOD) h[np1][i] -= MOD;
@@ -87,6 +92,7 @@ int main(int argc, char** argv) {
 			}
 			xp[np1] <<= 1;
 			if (xp[np1] >= MOD) xp[np1] -= MOD;
+
 			if (--rem) continue;
 		}
 
@@ -132,25 +138,24 @@ int main(int argc, char** argv) {
 		n++, np1++;
 	}
 
-	ofstream out("/home/vwang1/outm2.txt");
+	cout << "merge2 " << M << ' ' << N << ' ' << L << endl;
 	vector<unsigned long long> hz(n + 1);
 	vector<int> up_end(n), dn_end(n);
 	vector<unsigned __int128> ones(128);
 	for (int i = 1; i < 128; i++) {
 		ones[i] = ((ones[i - 1] + 1) << 1) - 1;
 	}
-	// for (L_ = 300; L_ < 1001; L_ += 50) { L = (L_ - 255) / 128 + 1;
 
+	for (int q = 0; q < Q; q++) {
 	clock_t START = clock();
-	memset(&up_end[0], 0, n * sizeof(int));
-	memset(&dn_end[0], 0, n * sizeof(int));
+	ofstream out("/home/vwang1/samp" + to_string(q) + ".txt");
 	for (int i = 0, ip1 = 1, idx = 0; i < n; i++, ip1++) {
-		hz[ip1] = hz[i];
 		x[i][M] = 0;
+		hz[ip1] = hz[i];
 		for (int b = 0; b < 128; b++) {
 			if (idx < N) {
-				x[i][M] = (x[i][M] << 1) | z[idx];
-				hz[ip1] = (hz[ip1] << 1) | z[idx];
+				x[i][M] = (x[i][M] << 1) | z[idx][q];
+				hz[ip1] = (hz[ip1] << 1) | z[idx][q];
 				idx++;
 			} else {
 				x[i][M] <<= 1;
@@ -160,24 +165,26 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	memset(&up_end[0], 0, n * sizeof(int));
+	memset(&dn_end[0], 0, n * sizeof(int));
 	int matches = 0;
 	for (int i = 0, ip1 = 1, t = 0, up_ct = 0, dn_ct = 0; i < n; i++, ip1++) {
 		inv_a[i][M] = t;
 		t = lower_bound(a[ip1].begin(), a[ip1].end(), M, [i](int i1, int i2) { unsigned __int128 x1 = x[i][i1], x2 = x[i][i2]; if (x1 != x2) return x1 < x2; return inv_a[i][i1] < inv_a[i][i2]; }) - a[ip1].begin();
-		if (ip1 < L) continue;
+		if (ip1 < l) continue;
 
-		int s_idx = i - L, min_start = max(0, s_idx * 128 + 1);
+		int s_idx = i - l, min_start = max(0, s_idx * 128 + 1);
 		bool touch = false;
 		if (up_ct == 0 && t > 0) {
 			int above = a[ip1][t - 1];
-			lt = hz[ip1 - L] < h[ip1 - L][above] ? MOD - h[ip1 - L][above] + hz[ip1 - L] : hz[ip1 - L] - h[ip1 - L][above];
+			lt = hz[ip1 - l] < h[ip1 - l][above] ? MOD - h[ip1 - l][above] + hz[ip1 - l] : hz[ip1 - l] - h[ip1 - l][above];
 			rt = hz[ip1] < h[ip1][above] ? MOD - h[ip1][above] + hz[ip1] : hz[ip1] - h[ip1][above];
-			touch = lt * xp[L] % MOD == rt;
+			touch = lt * xp[l] % MOD == rt;
 		}
 
 		if (up_ct > 0 || touch) {
 			int p = t - up_ct;
-			while (d[ip1][p] <= ip1 - L || touch) {
+			while (d[ip1][p] <= ip1 - l || touch) {
 				touch = false;
 				int above = a[ip1][--p];
 
@@ -214,7 +221,7 @@ int main(int argc, char** argv) {
 					}
 					end = (e_idx + 1) * 128 - lo;
 				}
-				if (end - min_start < L_) continue;
+				if (end - min_start < L) continue;
 				if (s_idx > -1) {
 					lo = 0, hi = 127;
 					while (lo < hi) {
@@ -228,7 +235,7 @@ int main(int argc, char** argv) {
 					start = (s_idx + 1) * 128 - lo;
 				}
 
-				if (end - start >= L_) {
+				if (end - start >= L) {
 					out << start << ' ' << end << ' ' << above << '\n';
 					matches++;
 				}
@@ -239,14 +246,14 @@ int main(int argc, char** argv) {
 		touch = false;
 		if (dn_ct == 0 && t < M) {
 			int below = a[ip1][t];
-			lt = hz[ip1 - L] < h[ip1 - L][below] ? MOD - h[ip1 - L][below] + hz[ip1 - L] : hz[ip1 - L] - h[ip1 - L][below];
+			lt = hz[ip1 - l] < h[ip1 - l][below] ? MOD - h[ip1 - l][below] + hz[ip1 - l] : hz[ip1 - l] - h[ip1 - l][below];
 			rt = hz[ip1] < h[ip1][below] ? MOD - h[ip1][below] + hz[ip1] : hz[ip1] - h[ip1][below];
-			touch = lt * xp[L] % MOD == rt;
+			touch = lt * xp[l] % MOD == rt;
 		}
 
 		if (dn_ct > 0 || touch) {
 			int p = t + dn_ct;
-			while ((p < M && d[ip1][p] <= ip1 - L) || touch) {
+			while ((p < M && d[ip1][p] <= ip1 - l) || touch) {
 				touch = false;
 				int below = a[ip1][p++];
 
@@ -283,7 +290,7 @@ int main(int argc, char** argv) {
 					}
 					end = (e_idx + 1) * 128 - lo;
 				}
-				if (end - min_start < L_) continue;
+				if (end - min_start < L) continue;
 				if (s_idx > -1) {
 					lo = 0, hi = 127;
 					while (lo < hi) {
@@ -297,7 +304,7 @@ int main(int argc, char** argv) {
 					start = (s_idx + 1) * 128 - lo;
 				}
 
-				if (end - start >= L_) {
+				if (end - start >= L) {
 					out << start << ' ' << end << ' ' << below << '\n';
 					matches++;
 				}
@@ -307,10 +314,9 @@ int main(int argc, char** argv) {
 	}
 
 	cout << clock() - START << " time\n";
-	cout << "merge2 " << M << ' ' << N << ' ' << L_ << ' ' << L << endl;
 	cout << matches << " matches\n\n";
 
-	// }
+	}
 
 	return 0;
 }

@@ -12,7 +12,6 @@ int main(int argc, char** argv) {
         ios_base::sync_with_stdio(0); cin.tie(0);
         string vcf = "/data6/ukbiobank/genotype_data/autosomal_chroms_june2018/21981/ukb_hap_GP_removed/ukb_hap_chr21_v2.vcf";
         ifstream in(vcf);
-	ofstream out("/home/vwang1/outo.txt");
 
         string line;
         while (getline(in, line)) {
@@ -22,29 +21,34 @@ int main(int argc, char** argv) {
         int m = -9;
         while (getline(ss, line, '\t')) m++;
         m <<= 1;
-        m--;
+	int Q = 10;
+	assert(Q % 2 == 0);
+	m -= Q;
 	int L = stoi(argv[1]), n = 0;
 
 	vector<vector<bool>> x;
-	vector<bool> z;
+	vector<vector<bool>> z;
 	vector<vector<int>> a, d, u, v;
 	vector<int> a0(m), a1(m), d0(m), d1(m);
 
         while (getline(in, line)) {
                 ss = stringstream(line);
                 for (int _ = 0; _ < 9; _++) getline(ss, line, '\t');
-                int index = 0;
+		z.push_back(vector<bool>(Q));
 		x.push_back(vector<bool>(m));
-                while (getline(ss, line, '\t')) {
-                        if (index == 0) {
-				z.push_back(line[0] != '0');
-                        } else {
-                                x[n][index++] = line[0] != '0';
-                        }
-                        x[n][index++] = line[2] != '0';
-                }
+		int index = 0;
+		while (index < Q) {
+			getline(ss, line, '\t');
+			z[n][index++] = line[0] != '0';
+			z[n][index++] = line[2] != '0';
+		}
+		index = 0;
+		while (index < m) {
+			getline(ss, line, '\t');
+			x[n][index++] = line[0] != '0';
+			x[n][index++] = line[2] != '0';
+		}
 
-                assert(index == m);
                 int u_ = 0, v_ = 0, p = n + 1, q = n + 1;
 
 		a.push_back(vector<int>(m));
@@ -87,11 +91,16 @@ int main(int argc, char** argv) {
                 n++;
         }
 
+	cout << "fullmem " << m << ' ' << n << ' ' << L << endl;
+
 	vector<int> t(n), zd(n), bd(n), dz(m);
+
+	for (int q = 0; q < Q; q++) {
 	clock_t START = clock();
-	if (z[0]) t[0] = m;
+	ofstream out("/home/vwang1/samo" + to_string(q) + ".txt");
+	t[0] = z[0][q] ? m : 0;
 	for (int i = 1; i < n; i++) {
-		if (z[i]) {
+		if (z[i][q]) {
 			t[i] = v[i][t[i - 1]];
 		} else {
 			t[i] = u[i][t[i - 1]];
@@ -103,22 +112,29 @@ int main(int argc, char** argv) {
 		z_idx = min(z_idx, i + 1);
 		b_idx = min(b_idx, i + 1);
 		if (t[i] > 0) {
-			while (z_idx > 0 && z[z_idx - 1] == x[z_idx - 1][a[i][t[i] - 1]]) z_idx--;
+			while (z_idx > 0 && z[z_idx - 1][q] == x[z_idx - 1][a[i][t[i] - 1]]) z_idx--;
 			zd[i] = z_idx;
 		} else zd[i] = i + 1;
 		if (t[i] < m) {
-			while (b_idx > 0 && z[b_idx - 1] == x[b_idx - 1][a[i][t[i]]]) b_idx--;
+			while (b_idx > 0 && z[b_idx - 1][q] == x[b_idx - 1][a[i][t[i]]]) b_idx--;
 			bd[i] = b_idx;
 		} else bd[i] = i + 1;
 	}
 
-	int f = t[L - 2], g = t[L - 2];
+	int f = t[L - 2], g = t[L - 2], f_end, g_end;
 	int matches = 0;
 	for (int i = L - 1; i < n; i++) {
-		int f_end = z[i] ? u[i][f] : v[i][f];
-		int g_end = z[i] ? u[i][g] : v[i][g];
-		f = z[i] ? v[i][f] : u[i][f];
-		g = z[i] ? v[i][g] : u[i][g];
+		if (z[i][q]) {
+			f_end = u[i][f];
+			g_end = u[i][g];
+			f = v[i][f];
+			g = v[i][g];
+		} else {
+			f_end = v[i][f];
+			g_end = v[i][g];
+			f = u[i][f];
+			g = u[i][g];
+		}
 
 		while (f_end < g_end) {
 			matches++;
@@ -156,8 +172,9 @@ int main(int argc, char** argv) {
 	}
 
 	cout << clock() - START << " time\n";
-	cout << "fullmem " << m << ' ' << n << ' ' << L << endl;
-	cout << matches << " matches\n";
+	cout << matches << " matches\n\n";
+
+	}
 
 	return 0;
 }
