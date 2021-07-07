@@ -12,15 +12,15 @@ using namespace std;
 
 const unsigned long long MOD = (1ull << 63) - 25;
 
-int M, N, n, L, l;
-vector<vector<unsigned __int128>> x;
+int M, N, n, L, l, Q;
+vector<vector<unsigned __int128>> x, z;
 vector<vector<unsigned long long>> h;
 vector<vector<int>> a, d, inv_a;
 vector<unsigned long long> xp = {1};
-vector<vector<bool>> z;
 
 int main(int argc, char** argv) {
-	string vcf = "/data6/ukbiobank/genotype_data/autosomal_chroms_june2018/21981/ukb_hap_GP_removed/ukb_hap_chr21_v2.vcf";
+	string chr = argv[2];
+	string vcf = "/data6/victor/panel" + chr + ".vcf";
 	ifstream in(vcf);
 	ios_base::sync_with_stdio(0); cin.tie(0);
 
@@ -28,21 +28,25 @@ int main(int argc, char** argv) {
 	while (getline(in, line)) {
 		if (line[0] != '#' || line[1] != '#') break;
 	}
+	while (getline(in, line)) N++;
+	n = (N + 127) / 128;
+	in.clear(), in.seekg(0);
+	while (getline(in, line)) {
+		if (line[0] != '#' || line[1] != '#') break;
+	}
 	stringstream ss(line);
 	M = -9;
 	while (getline(ss, line, '\t')) M++;
 	M <<= 1;
-	int Q = 10;
-	assert(Q % 2 == 0);
-	M -= Q;
-	N = 0, n = 0;
 	L = stoi(argv[1]), assert(L >= 255), l = (L - 127) / 128;
 
-	h.push_back(vector<unsigned long long>(M));
+	h.resize(M, vector<unsigned long long>(n + 1));
+	x.resize(M + 1, vector<unsigned __int128>(n));
 	a.push_back(vector<int>(M));
 	iota(a[0].begin(), a[0].end(), 0);
 	d.push_back(vector<int>(M));
 
+	N = 0, n = 0;
 	int rem = -1, np1 = 1;
 	unsigned __int128 lt, rt;
 	int lo, hi, g;
@@ -54,46 +58,37 @@ int main(int argc, char** argv) {
 				continue;
 			}
 
-			z.push_back(vector<bool>(Q));
 			if (N % 128 == 0) {
-				x.push_back(vector<unsigned __int128>(M + 1));
-				h.push_back(h[n]);
 				xp.push_back(xp[n]);
+				for (int i = 0; i < M; i++) h[i][np1] = h[i][n];
 			}
 			ss = stringstream(line);
 			for (int _ = 0; _ < 9; _++) getline(ss, line, '\t');
 			int i = 0;
-			while (i < Q) {
-				getline(ss, line, '\t');
-				z[N][i++] = line[0] != '0';
-				z[N][i++] = line[2] != '0';
-			}
-			i = 0;
-			while (i < M) {
-				getline(ss, line, '\t');
-				x[n][i] = (x[n][i] << 1) | (line[0] != '0');
-				h[np1][i] = (h[np1][i] << 1) | (line[0] != '0');
-				if (h[np1][i] >= MOD) h[np1][i] -= MOD;
+			while (getline(ss, line, '\t')) {
+				x[i][n] = (x[i][n] << 1) | (line[0] != '0');
+				h[i][np1] = (h[i][np1] << 1) | (line[0] != '0');
+				if (h[i][np1] >= MOD) h[i][np1] -= MOD;
 				i++;
-				x[n][i] = (x[n][i] << 1) | (line[2] != '0');
-				h[np1][i] = (h[np1][i] << 1) | (line[2] != '0');
-				if (h[np1][i] >= MOD) h[np1][i] -= MOD;
+				x[i][n] = (x[i][n] << 1) | (line[2] != '0');
+				h[i][np1] = (h[i][np1] << 1) | (line[2] != '0');
+				if (h[i][np1] >= MOD) h[i][np1] -= MOD;
 				i++;
 			}
 			xp[np1] <<= 1;
 			if (xp[np1] >= MOD) xp[np1] -= MOD;
 
-			if (++N % 128) continue;
+			if (++N % 128 > 0) continue;
 		} else {
 			for (int i = 0; i < M; i++) {
-				x[n][i] <<= 1;
-				h[np1][i] <<= 1;
-				if (h[np1][i] >= MOD) h[np1][i] -= MOD;
+				x[i][n] <<= 1;
+				h[i][np1] <<= 1;
+				if (h[i][np1] >= MOD) h[i][np1] -= MOD;
 			}
 			xp[np1] <<= 1;
 			if (xp[np1] >= MOD) xp[np1] -= MOD;
 
-			if (--rem) continue;
+			if (--rem > 0) continue;
 		}
 
 		inv_a.push_back(vector<int>(M + 1));
@@ -103,7 +98,7 @@ int main(int argc, char** argv) {
 
 		a.push_back(a[0]);
 		sort(a[np1].begin(), a[np1].end(), [](int i, int j) {
-			if (x[n][i] != x[n][j]) return x[n][i] < x[n][j];
+			if (x[i][n] != x[j][n]) return x[i][n] < x[j][n];
 			return inv_a[n][i] < inv_a[n][j];
 		});
 
@@ -112,17 +107,17 @@ int main(int argc, char** argv) {
 		for (int i = 1; i < M; i++) {
 			int x_cur = a[np1][i], x_above = a[np1][i - 1], a_prev = inv_a[n][x_cur];
 
-			if (x[n][x_cur] != x[n][x_above]) {
+			if (x[x_cur][n] != x[x_above][n]) {
 				d[np1][i] = np1;
 			} else if (a_prev > 0 && x_above == a[n][a_prev - 1]) {
 				d[np1][i] = d[n][a_prev];
 			} else {
 				lo = d[n][a_prev], hi = n;
-				rt = h[np1][x_cur] < h[np1][x_above] ? MOD - h[np1][x_above] + h[np1][x_cur] : h[np1][x_cur] - h[np1][x_above];
+				rt = h[x_cur][np1] < h[x_above][np1] ? MOD - h[x_above][np1] + h[x_cur][np1] : h[x_cur][np1] - h[x_above][np1];
 
 				while (lo < hi) {
 					g = (lo + hi) >> 1;
-					lt = h[g][x_cur] < h[g][x_above] ? MOD - h[g][x_above] + h[g][x_cur] : h[g][x_cur] - h[g][x_above];
+					lt = h[x_cur][g] < h[x_above][g] ? MOD - h[x_above][g] + h[x_cur][g] : h[x_cur][g] - h[x_above][g];
 
 					if (lt * xp[np1 - g] % MOD == rt) {
 						hi = g;
@@ -137,49 +132,65 @@ int main(int argc, char** argv) {
 
 		n++, np1++;
 	}
+	in.close();
 
-	cout << "merge2 " << M << ' ' << N << ' ' << L << endl;
+	cout << "merge128 " << M << ' ' << N << ' ' << L << endl;
 	vector<unsigned long long> hz(n + 1);
 	vector<int> up_end(n), dn_end(n);
-	vector<unsigned __int128> ones(128);
-	for (int i = 1; i < 128; i++) {
-		ones[i] = ((ones[i - 1] + 1) << 1) - 1;
+	unsigned __int128 ones = -1;
+
+	clock_t START = clock();
+	int matches = 0;
+	string q_vcf = "/data6/victor/query" + chr + ".vcf";
+	ifstream q_in(q_vcf);
+	while (getline(q_in, line)) {
+		if (line[0] != '#' || line[1] != '#') break;
 	}
+	Q = -9;
+	ss = stringstream(line);
+	while (getline(ss, line, '\t')) Q++;
+	Q <<= 1;
+	z.resize(n, vector<unsigned __int128>(Q));
+	int NN = 0;
+	while (getline(q_in, line)) {
+		ss = stringstream(line);
+		for (int _ = 0; _ < 9; _++) getline(ss, line, '\t');
+		int i = 0, nn = NN / 128;
+		while (getline(ss, line, '\t')) {
+			z[nn][i] = (z[nn][i] << 1) | (line[0] != '0');
+			i++;
+			z[nn][i] = (z[nn][i] << 1) | (line[2] != '0');
+			i++;
+		}
+		NN++;
+	}
+	q_in.close();
 
 	for (int q = 0; q < Q; q++) {
-	clock_t START = clock();
-	ofstream out("/home/vwang1/samp" + to_string(q) + ".txt");
-	for (int i = 0, ip1 = 1, idx = 0; i < n; i++, ip1++) {
-		x[i][M] = 0;
-		hz[ip1] = hz[i];
-		for (int b = 0; b < 128; b++) {
-			if (idx < N) {
-				x[i][M] = (x[i][M] << 1) | z[idx][q];
-				hz[ip1] = (hz[ip1] << 1) | z[idx][q];
-				idx++;
-			} else {
-				x[i][M] <<= 1;
-				hz[ip1] <<= 1;
-			}
-			if (hz[ip1] >= MOD) hz[ip1] -= MOD;
-		}
+	ofstream out("/home/vwang1/PBWT_compression/query0128-" + to_string(q) + ".out");
+	z[n - 1][q] <<= n * 128 - N;
+	for (int i = 0, ip1 = 1; i < n; i++, ip1++) {
+		x[M][i] = z[i][q];
+		hz[ip1] = ((unsigned __int128) hz[i] * xp[1] + x[M][i] % MOD) % MOD;
 	}
 
 	memset(&up_end[0], 0, n * sizeof(int));
 	memset(&dn_end[0], 0, n * sizeof(int));
-	int matches = 0;
 	for (int i = 0, ip1 = 1, t = 0, up_ct = 0, dn_ct = 0; i < n; i++, ip1++) {
 		inv_a[i][M] = t;
-		t = lower_bound(a[ip1].begin(), a[ip1].end(), M, [i](int i1, int i2) { unsigned __int128 x1 = x[i][i1], x2 = x[i][i2]; if (x1 != x2) return x1 < x2; return inv_a[i][i1] < inv_a[i][i2]; }) - a[ip1].begin();
+		t = lower_bound(a[ip1].begin(), a[ip1].end(), M, [i](int i1, int i2) { if (x[i1][i] != x[i2][i]) return x[i1][i] < x[i2][i]; return inv_a[i][i1] < inv_a[i][i2]; }) - a[ip1].begin();
 		if (ip1 < l) continue;
 
 		int s_idx = i - l, min_start = max(0, s_idx * 128 + 1);
 		bool touch = false;
 		if (up_ct == 0 && t > 0) {
 			int above = a[ip1][t - 1];
-			lt = hz[ip1 - l] < h[ip1 - l][above] ? MOD - h[ip1 - l][above] + hz[ip1 - l] : hz[ip1 - l] - h[ip1 - l][above];
-			rt = hz[ip1] < h[ip1][above] ? MOD - h[ip1][above] + hz[ip1] : hz[ip1] - h[ip1][above];
-			touch = lt * xp[l] % MOD == rt;
+			if (dn_ct > 0) touch = d[ip1][t] <= ip1 - l;
+			else if (x[M][i] == x[above][i]) {
+				lt = hz[ip1 - l] < h[above][ip1 - l] ? MOD - h[above][ip1 - l] + hz[ip1 - l] : hz[ip1 - l] - h[above][ip1 - l];
+				rt = hz[ip1] < h[above][ip1] ? MOD - h[above][ip1] + hz[ip1] : hz[ip1] - h[above][ip1];
+				touch = lt * xp[l] % MOD == rt;
+			}
 		}
 
 		if (up_ct > 0 || touch) {
@@ -189,15 +200,15 @@ int main(int argc, char** argv) {
 				int above = a[ip1][--p];
 
 				lo = ip1;
-				int stop = min(n, lo + 10);
-				while (lo < stop && x[lo][M] == x[lo][above]) lo++;
-				if (lo == stop) {
+				int pivot = min(n, lo + 10);
+				while (lo < pivot && x[M][lo] == x[above][lo]) lo++;
+				if (lo == pivot) {
 					hi = n;
-					lt = hz[i] < h[i][above] ? MOD - h[i][above] + hz[i] : hz[i] - h[i][above];
+					lt = hz[i] < h[above][i] ? MOD - h[above][i] + hz[i] : hz[i] - h[above][i];
 
 					while (lo < hi) {
 						g = (lo + hi + 1) >> 1;
-						rt = hz[g] < h[g][above] ? MOD - h[g][above] + hz[g] : hz[g] - h[g][above];
+						rt = hz[g] < h[above][g] ? MOD - h[above][g] + hz[g] : hz[g] - h[above][g];
 
 						if (lt * xp[g - i] % MOD == rt) {
 							lo = g;
@@ -213,7 +224,7 @@ int main(int argc, char** argv) {
 					lo = 1, hi = 128;
 					while (lo < hi) {
 						g = (lo + hi) >> 1;
-						if ((x[e_idx][M] >> g) == (x[e_idx][above] >> g)) {
+						if ((x[M][e_idx] >> g) == (x[above][e_idx] >> g)) {
 							hi = g;
 						} else {
 							lo = g + 1;
@@ -223,16 +234,16 @@ int main(int argc, char** argv) {
 				}
 				if (end - min_start < L) continue;
 				if (s_idx > -1) {
-					lo = 0, hi = 127;
+					lo = 1, hi = 128;
 					while (lo < hi) {
-						g = (lo + hi + 1) >> 1;
-						if ((x[s_idx][M] & ones[g]) == (x[s_idx][above] & ones[g])) {
-							lo = g;
+						g = (lo + hi) >> 1;
+						if ((x[M][s_idx] & (ones >> g)) == (x[above][s_idx] & (ones >> g))) {
+							hi = g;
 						} else {
-							hi = g - 1;
+							lo = g + 1;
 						}
 					}
-					start = (s_idx + 1) * 128 - lo;
+					start = s_idx * 128 + lo;
 				}
 
 				if (end - start >= L) {
@@ -246,9 +257,12 @@ int main(int argc, char** argv) {
 		touch = false;
 		if (dn_ct == 0 && t < M) {
 			int below = a[ip1][t];
-			lt = hz[ip1 - l] < h[ip1 - l][below] ? MOD - h[ip1 - l][below] + hz[ip1 - l] : hz[ip1 - l] - h[ip1 - l][below];
-			rt = hz[ip1] < h[ip1][below] ? MOD - h[ip1][below] + hz[ip1] : hz[ip1] - h[ip1][below];
-			touch = lt * xp[l] % MOD == rt;
+			if (up_ct > 0) touch = d[ip1][t] <= ip1 - l;
+			else if (x[below][i] == x[M][i]) {
+				lt = hz[ip1 - l] < h[below][ip1 - l] ? MOD - h[below][ip1 - l] + hz[ip1 - l] : hz[ip1 - l] - h[below][ip1 - l];
+				rt = hz[ip1] < h[below][ip1] ? MOD - h[below][ip1] + hz[ip1] : hz[ip1] - h[below][ip1];
+				touch = lt * xp[l] % MOD == rt;
+			}
 		}
 
 		if (dn_ct > 0 || touch) {
@@ -258,15 +272,15 @@ int main(int argc, char** argv) {
 				int below = a[ip1][p++];
 
 				lo = ip1;
-				int stop = min(n, lo + 10);
-				while (lo < stop && x[lo][M] == x[lo][below]) lo++;
-				if (lo == stop) {
+				int pivot = min(n, lo + 10);
+				while (lo < pivot && x[M][lo] == x[below][lo]) lo++;
+				if (lo == pivot) {
 					hi = n;
-					lt = hz[i] < h[i][below] ? MOD - h[i][below] + hz[i] : hz[i] - h[i][below];
+					lt = hz[i] < h[below][i] ? MOD - h[below][i] + hz[i] : hz[i] - h[below][i];
 
 					while (lo < hi) {
 						g = (lo + hi + 1) >> 1;
-						rt = hz[g] < h[g][below] ? MOD - h[g][below] + hz[g] : hz[g] - h[g][below];
+						rt = hz[g] < h[below][g] ? MOD - h[below][g] + hz[g] : hz[g] - h[below][g];
 
 						if (lt * xp[g - i] % MOD == rt) {
 							lo = g;
@@ -274,7 +288,7 @@ int main(int argc, char** argv) {
 							hi = g - 1;
 						}
 					}
-				}
+				} 
 				dn_end[lo - 1]++;
 
 				int start = 0, end = N, e_idx = lo;
@@ -282,7 +296,7 @@ int main(int argc, char** argv) {
 					lo = 1, hi = 128;
 					while (lo < hi) {
 						g = (lo + hi) >> 1;
-						if ((x[e_idx][M] >> g) == (x[e_idx][below] >> g)) {
+						if ((x[M][e_idx] >> g) == (x[below][e_idx] >> g)) {
 							hi = g;
 						} else {
 							lo = g + 1;
@@ -292,16 +306,16 @@ int main(int argc, char** argv) {
 				}
 				if (end - min_start < L) continue;
 				if (s_idx > -1) {
-					lo = 0, hi = 127;
+					lo = 1, hi = 128;
 					while (lo < hi) {
-						g = (lo + hi + 1) >> 1;
-						if ((x[s_idx][M] & ones[g]) == (x[s_idx][below] & ones[g])) {
-							lo = g;
+						g = (lo + hi) >> 1;
+						if ((x[M][s_idx] & (ones >> g)) == (x[below][s_idx] & (ones >> g))) {
+							hi = g;
 						} else {
-							hi = g - 1;
+							lo = g + 1;
 						}
 					}
-					start = (s_idx + 1) * 128 - lo;
+					start = s_idx * 128 + lo;
 				}
 
 				if (end - start >= L) {
@@ -312,11 +326,10 @@ int main(int argc, char** argv) {
 			dn_ct = p - t - dn_end[i];
 		}
 	}
+	}
 
 	cout << clock() - START << " time\n";
 	cout << matches << " matches\n\n";
-
-	}
 
 	return 0;
 }

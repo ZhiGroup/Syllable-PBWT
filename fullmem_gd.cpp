@@ -12,7 +12,9 @@ int main(int argc, char** argv) {
         ios_base::sync_with_stdio(0); cin.tie(0);
 	string chr = argv[2];
 	string vcf = "/data6/victor/panel" + chr + ".vcf";
-        ifstream in(vcf);
+	ifstream in(vcf);
+	string map_file = "/data6/ukbiobank/tmp/debug_rapid_misc/decode_maps_hg19_filtered/ukb_" + chr + ".rMap";
+	ifstream in_map(map_file);
 
         string line;
         while (getline(in, line)) {
@@ -22,11 +24,14 @@ int main(int argc, char** argv) {
         int M = -9;
         while (getline(ss, line, '\t')) M++;
         M <<= 1;
-	int L = stoi(argv[1]), N = 0;
+	int N = 0;
+	double L = stod(argv[1]);
 
 	vector<vector<bool>> x;
 	vector<vector<int>> a, d, u, v;
 	vector<int> a0(M), a1(M), d0(M), d1(M);
+
+	vector<double> locs;
 
         while (getline(in, line)) {
                 ss = stringstream(line);
@@ -77,8 +82,21 @@ int main(int argc, char** argv) {
                                 d[N][i] = d1[i - u_];
                         }
                 }
+
+		getline(in_map, line);
+		ss = stringstream(line);
+		getline(ss, line, '\t');
+		getline(ss, line, '\t');
+		try {
+			locs.push_back(stod(line));
+		} catch (exception& e) {
+			locs.push_back(0);
+		}
+
                 N++;
         }
+	in.close();
+	in_map.close();
 
 	cout << "fullmem " << M << ' ' << N << ' ' << L << endl;
 
@@ -107,9 +125,10 @@ int main(int argc, char** argv) {
 		}
 		NN++;
 	}
+	q_in.close();
 
 	for (int q = 0; q < Q; q++) {
-	ofstream out("/home/vwang1/PBWT_compression/queryf-" + to_string(q) + ".out");
+	ofstream out("/home/vwang1/PBWT_compression/queryfull-" + to_string(q) + ".txt");
 	t[0] = z[0][q] ? M : 0;
 	for (int i = 1; i < N; i++) {
 		if (z[i][q]) {
@@ -133,8 +152,8 @@ int main(int argc, char** argv) {
 		} else bd[i] = i + 1;
 	}
 
-	int f = t[L - 2], g = t[L - 2], f_end, g_end;
-	for (int i = L - 1; i < N; i++) {
+	int f = t[0], g = t[0], f_end, g_end;
+	for (int i = 1, req_idx = 0, up_idx = 0, dn_idx = 0; i < N; i++) {
 		if (z[i][q]) {
 			f_end = u[i][f];
 			g_end = u[i][g];
@@ -147,6 +166,9 @@ int main(int argc, char** argv) {
 			g = u[i][g];
 		}
 
+		while (req_idx < i && locs[i] - locs[req_idx] >= L) req_idx++;
+		if (req_idx == 0) continue;
+
 		while (f_end < g_end) {
 			matches++;
 			out << dz[a[i][f_end]] << ' ' << i << ' ' << a[i][f_end] << '\n';
@@ -154,20 +176,24 @@ int main(int argc, char** argv) {
 		}
 
 		if (f == g) {
-			if (f > 0 && zd[i] == i + 1 - L) {
-				dz[a[i][--f]] = i + 1 - L;
+			if (f > 0 && zd[i] < req_idx) {
+				up_idx = zd[i];
+				dz[a[i][--f]] = up_idx;
 			}
-			if (g < M && bd[i] == i + 1 - L) {
-				dz[a[i][g++]] = i + 1 - L;
+			if (g < M && bd[i] < req_idx) {
+				dn_idx = bd[i];
+				dz[a[i][g++]] = dn_idx;
 			}
 		}
 
 		if (f < g) {
-			while (f > 0 && d[i][f] <= i + 1 - L) {
-				dz[a[i][--f]] = i + 1 - L;
+			while (f > 0 && d[i][f] < req_idx) {
+				up_idx = max(up_idx, d[i][f]);
+				dz[a[i][--f]] = up_idx;
 			}
-			while (g < M && d[i][g] <= i + 1 - L) {
-				dz[a[i][g++]] = i + 1 - L;
+			while (g < M && d[i][g] < req_idx) {
+				dn_idx = max(dn_idx, d[i][g]);
+				dz[a[i][g++]] = dn_idx;
 			}
 		}
 	}
