@@ -1,11 +1,8 @@
-#include <iostream>
-#include <fstream>
-#include <cstring>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <chrono>
+#include <iostream>
+#include <math.h>
 
-#include "Reporter.cpp"
+#include "SparseQuery.cpp"
 
 using namespace std;
 
@@ -41,7 +38,7 @@ void show_query_usage() {
 		"\t                                     Format: Sites described by one line each with genetic location as the last tab-delimited field\n" <<
 		"\t-s,--save <FILE>                     Path to output file to save panel data, for fast loading when rerunning this program with --load\n" <<
 		"\t-E,--exit                            Exit the program\n" <<
-		"Format of reported matches: Haplotypes will be referred to with its sample ID in the VCF file, followed by -0 or -1, indicating the first or second haplotype, respectively, of a given individual. For each query haplotype, a file titled the haplotype's name will be written to, with one match reported per line, consisting of at least 3 tab-delimited fields $1 $2 $3, indicating a match over sites [$1, $2) with panel haplotype $3. If the query unit is cM or bps, there will be a fourth field indicating the length of the match in terms of the unit specified." << endl;
+		"Format of reported matches: Haplotypes will be referred to with the sample ID in the VCF file, followed by -0 or -1, indicating the first or second haplotype, respectively, of a given individual. For each query haplotype, a txt file titled the haplotype's name will be written to, with one match reported per line, consisting of at least 3 tab-delimited fields $1 $2 $3, indicating a match over sites [$1, $2) with panel haplotype $3. If the query unit is cM or bps, there will be a fourth field indicating the length of the match in terms of the unit specified." << endl;
 }
 
 string getDir(string &s) {
@@ -52,11 +49,11 @@ string getDir(string &s) {
 
 template<class T>
 void listen() {
-	Reporter<T> rep;
+	SparseQuery<T> sq;
 
 	if (input_file_set) {
 		cout << "Precomputing on " << input_file << endl;
-		int code = rep.precompute(input_file);
+		int code = sq.precompute(input_file);
 		if (code == 1) {
 			cerr << "Input file does not exist or cannot be read." << endl;
 			return;
@@ -68,7 +65,7 @@ void listen() {
 		cout << "Precomputation complete" << endl;
 	} else {
 		cout << "Loading data from " << load_file << endl;
-		int code = rep.load(load_file);
+		int code = sq.load(load_file);
 		if (code == 1) {
 			cerr << "Load file does not exist or cannot be read." << endl;
 			return;
@@ -78,17 +75,17 @@ void listen() {
 			return;
 		}
 		if (code == 3) {
-			cerr << "The specified --bits value, " << B << ", does not coincide with the one in the save file, " << rep.B << "." << endl;
+			cerr << "The specified --bits value, " << B << ", does not coincide with the one in the save file, " << sq.B << "." << endl;
 			return;
 		}
 		cout << "Loading data complete" << endl;
 	}
 
-	rep.show_attributes();
+	sq.show_attributes();
 
 	if (save_file_set) {
 		cout << "Saving data to " << save_file << endl;
-		int code = rep.save(save_file);
+		int code = sq.save(save_file);
 		if (code == 1) {
 			cerr << "Save file cannot be written to." << endl;
 		} else {
@@ -112,7 +109,7 @@ void listen() {
 				skip = true; break;
 			}
 			if (flag == "-a" || flag == "--attr") {
-				rep.show_attributes();
+				sq.show_attributes();
 				skip = true; break;
 			}
 			if (flag == "-E" || flag == "--exit") {
@@ -126,7 +123,7 @@ void listen() {
 
 			if (flag == "-g" || flag == "--gen_map") {
 				cout << "Loading genetic map from " << val << endl;
-				int code = rep.set_gen_map(val.c_str());
+				int code = sq.set_gen_map(val.c_str());
 				if (code == 1) {
 					cerr << "Genetic map file does not exist or cannot be read." << endl;
 				} else if (code == 2) {
@@ -135,13 +132,13 @@ void listen() {
 					cerr << "Genetic map file does not contain a number in the last tab-delimited field of every line." << endl;
 				} else {
 					cout << "Genetic map loaded." << endl;
-					rep.show_attributes();
+					sq.show_attributes();
 				}
 				skip = true; break;
 			}
 			if (flag == "-s" || flag == "--save") {
 				cout << "Saving data to " << val << endl;
-				int code = rep.save(val.c_str());
+				int code = sq.save(val.c_str());
 				if (code == 1) {
 					cerr << "Save file cannot be written to." << endl;
 				} else {
@@ -188,11 +185,11 @@ void listen() {
 		const clock_t START = clock();
 		int code;
 		if (unit == "sites") {
-			code = rep.query(query_file.c_str(), output_dir.c_str(), (int) L);
+			code = sq.query(query_file.c_str(), output_dir.c_str(), (int) ceil(L));
 		} else if (unit == "cM") {
-			code = rep.query(query_file.c_str(), output_dir.c_str(), L, rep.genLocs);
+			code = sq.query(query_file.c_str(), output_dir.c_str(), L, sq.geneLocs);
 		} else { // "bps"
-			code = rep.query(query_file.c_str(), output_dir.c_str(), (int) L, rep.physLocs);
+			code = sq.query(query_file.c_str(), output_dir.c_str(), (int) ceil(L), sq.physLocs);
 		}
 
 		if (code == 1) {
@@ -202,9 +199,9 @@ void listen() {
 		} else if (code == 3) {
 			cerr << "A genetic map must have been specified to query with genetic distance." << endl;
 		} else if (code == 4) {
-			cerr << "The query length, " << L << " " << unit << ", is less than the minimum allowable query length," << (unit == "sites" ? rep.minSiteL : unit == "cM" ? rep.minGenL : rep.minPhysL) << " " << unit << "." << endl;
+			cerr << "The query length, " << L << " " << unit << ", is less than the minimum allowable query length, " << (unit == "sites" ? sq.minSiteL : unit == "cM" ? sq.minGeneL : sq.minPhysL) << " " << unit << "." << endl;
 		} else if (code == 5) {
-			cerr << "Query file not in VCF format." << endl;
+			cerr << "Query file not in VCF format or has a different number of sites from the initial panel." << endl;
 		} else {
 			cout << "Query results outputted to " << output_dir << "\nElapsed CPU time (s): " << double(clock() - START) / CLOCKS_PER_SEC << endl;
 		}
@@ -212,6 +209,11 @@ void listen() {
 }
 
 int main(int argc, char** argv) {
+	if (argc == 1) {
+		show_usage(argv[0]);
+		return 0;
+	}
+
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
 

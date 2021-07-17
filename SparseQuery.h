@@ -1,28 +1,28 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Wshift-count-overflow"
 
-#include <iostream>
-#include <fstream>
-#include <numeric>
-#include <sstream>
-#include <vector>
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <chrono>
+#include <fstream>
+#include <iostream>
+#include <numeric>
+#include <sstream>
 #include <unistd.h>
+#include <vector>
 
 using namespace std;
 
 template<class T>
-class Reporter {
-public:
-	const unsigned long long MOD = (1ull << 63) - 25;
-	int M{0}, N{0}, n{0}, B{sizeof(T) * 8};
+struct SparseQuery {
+	static const unsigned long long MOD{-1ull - 58};
+	const int B{sizeof(T) * 8};
+	int M{0}, N{0}, n{0};
 	int minSiteL{B * 2 - 1}, minPhysL{0};
-	double minGenL{-1};
-	vector<double> genLocs;
+	double minGeneL{-1};
+	vector<double> geneLocs;
 	vector<int> physLocs;
-	vector<string> sampleIDs;
+	vector<string> IDs;
 	vector<vector<T>> x;
 	vector<vector<unsigned long long>> h;
 	vector<vector<int>> a, d, inv_a;
