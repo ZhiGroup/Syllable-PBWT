@@ -1,9 +1,10 @@
 all: main
 
-main: main.cpp SparseQuery.cpp SparseQuery.h SparseTable.h
-	g++ -std=c++17 -Wshadow -Wall -o main main.cpp -O2 -Wno-unused-result
+main: server.cpp client.cpp StrideQuery.cpp StrideQuery.h SparseTable.h
+	g++ -std=c++17 -Wshadow -Wall -o server server.cpp -O2 -Wno-unused-result
+	g++ -std=c++17 -Wshadow -Wall -o client client.cpp -O2 -Wno-unused-result
 
 clean:
-	rm -f main SparseQuery
+	rm -f server client StrideQuery
 
 .PHONY: all clean

@@ -1,12 +1,12 @@
-#include "SparseQuery.h"
 #include "SparseTable.h"
+#include "StrideQuery.h"
 
 template<class T>
-int SparseQuery<T>::precompute(const char* input_file) {
+int StrideQuery<T>::precompute(const char* input_file) {
 	ifstream in(input_file);
 	if (in.fail()) return 1;
 
-	// get M = # haplotypes, N = # sites, n = # sparse sites, IDs
+	// get M = # haplotypes, N = # sites, n = # segments, IDs
 	string line;
 	while (getline(in, line)) {
 		if (line.size() < 2u) return 2;
@@ -34,7 +34,7 @@ int SparseQuery<T>::precompute(const char* input_file) {
 		IDs[i] += "-0";
 	}
 
-	// resize data structures for sparse panel
+	// resize strided data structures for segmented panel
 	x.resize(M + 1, vector<T>(n));
 	inv_a.resize(n, vector<int>(M + 1));
 	a.resize(n + 1, vector<int>(M));
@@ -43,7 +43,7 @@ int SparseQuery<T>::precompute(const char* input_file) {
 
 	{ SparseTable st(M);
 
-	// K = current site, k = current sparse site, kp1 = k+1
+	// K = current site, k = current segment, kp1 = k+1
 	for (int K = 0, k = 0, kp1 = 1; K < N; K++) {
 		getline(in, line);
 		ss = stringstream(line);
@@ -54,7 +54,7 @@ int SparseQuery<T>::precompute(const char* input_file) {
 				catch (exception& e) { return 2; }
 			}
 		}
-		// update sparse panel with current site
+		// update current segment with current site
 		int index = 0;
 		while (getline(ss, line, '\t')) {
 			if (index == M || line.size() < 3u) return 2;
@@ -63,22 +63,22 @@ int SparseQuery<T>::precompute(const char* input_file) {
 		}
 		if (index != M) return 2;
 
-		if (K == N - 1) { // if last site, pad last sparse site with 0s
+		if (K == N - 1) { // if last site, pad last segment with 0s
 			int pad = n * B - N;
 			for (int i = 0; i < M; i++) x[i][k] <<= pad;
 			K += pad;
 		}
-		if ((K + 1) % B > 0) continue; // skip if not end of sparse site
+		if ((K + 1) % B > 0) continue; // skip if not end of segment
 
-		// min query length = max distance across any 2 adjacent sparse sites
-		minPhysL = max(minPhysL, physLocs[min(K, N - 1)] - physLocs[(k - 1) * B]);
+		// min query length = max distance across any 2 adjacent segments
+		minPhysL = max(minPhysL, (K >= N - 1 ? physLocs[N - 1] + 1 : physLocs[K]) - physLocs[(k - 1) * B]);
 
 		// inv_a[k][i] = j where a[k][j] = i
 		for (int i = 0; i < M; i++) {
 			inv_a[k][a[k][i]] = i;
 		}
 
-		// sort haplotypes in a[k+1] by (value at site k, position in a[k])
+		// sort haplotypes in a[k+1] by (value at segment k, position in a[k])
 		iota(a[kp1].begin(), a[kp1].end(), 0);
 		sort(a[kp1].begin(), a[kp1].end(), [&, k](int i, int j) {
 			if (x[i][k] != x[j][k]) return x[i][k] < x[j][k];
@@ -129,7 +129,7 @@ int SparseQuery<T>::precompute(const char* input_file) {
 }
 
 template<class T>
-int SparseQuery<T>::save(const char* save_file) {
+int StrideQuery<T>::save(const char* save_file) {
 	ofstream out(save_file, ios::binary);
 	if (out.fail()) return 1;
 
@@ -164,11 +164,18 @@ int SparseQuery<T>::save(const char* save_file) {
 		}
 	}
 
+	if (minGeneL != -1) {
+		out.write((char*) &minGeneL, sizeof(double));
+		for (int i = 0; i < N; i++) {
+			out.write((char*) &geneLocs[i], sizeof(double));
+		}
+	}
+
 	return 0;
 }
 
 template<class T>
-int SparseQuery<T>::load(const char* load_file) {
+int StrideQuery<T>::load(const char* load_file) {
 	ifstream in(load_file, ios::binary);
 	if (in.fail()) return 1;
 
@@ -224,23 +231,36 @@ int SparseQuery<T>::load(const char* load_file) {
 		}
 	}
 
+	if (!in.read((char*) &minGeneL, sizeof(double))) {
+		minGeneL = -1;
+		return 0;
+	}
+	geneLocs.resize(N);
+	for (int i = 0; i < N; i++) {
+		if (!in.read((char*) &geneLocs[i], sizeof(double))) {
+			minGeneL = -1;
+			return 3;
+		}
+	}
+
 	return 0;
 }
 
 template<class T>
-void SparseQuery<T>::show_attributes() {
-	cout << "\nData attributes:\n" <<
-		"\tM = " << M << " haplotypes, N = " << N << " sites, B = " << B << '\n';
-        if (minGeneL == -1) {
-		cout << "\tYour minimum allowable query lengths are " << minSiteL << " sites or " << minPhysL << " bps.\n" <<
-                        "\tProvide a genetic map to query in units of cM." << endl;
+string StrideQuery<T>::show_attributes() {
+	string attr = "\nData attributes:\n"
+		"\tM = " + to_string(M) + " haplotypes, N = " + to_string(N) + " sites, B = " + to_string(B) + " sites\n";
+	if (minGeneL == -1) {
+		attr += "\tYour minimum allowable query lengths are " + to_string(minSiteL) + " sites or " + to_string(minPhysL) + " bps.\n"
+		"\tThe server program must have provided a genetic map to allow queries in cM.";
 	} else {
-                cout << "\tYour minimum allowable query lengths are " << minGeneL << " cM, " << minSiteL << " sites, or " << minPhysL << " bps." << endl;
-        }
+		attr += "\tYour minimum allowable query lengths are " + to_string(minGeneL) + " cM, " + to_string(minSiteL) + " sites, or " + to_string(minPhysL) + " bps.";
+	}
+	return attr;
 }
 
 template<class T>
-int SparseQuery<T>::set_gen_map(const char* map_file) {
+int StrideQuery<T>::set_gen_map(const char* map_file) {
 	ifstream in(map_file);
 	if (in.fail()) return 1;
 
@@ -253,26 +273,54 @@ int SparseQuery<T>::set_gen_map(const char* map_file) {
 		while (getline(ss, line, '\t')) {}
 		try { geneLocs[i] = stod(line); }
 		catch (out_of_range &e) {}
-		catch (exception &e) { return 3; }
+		catch (exception &e) { i--; }
 	}
-	// min query length = max distance across any 2 adjacent sparse sites
+	if (getline(in, line)) return 2;
+	// min query length = max distance across any 2 adjacent segments
 	for (int i = 1; i < n; i++) {
-		minGeneL = max(minGeneL, geneLocs[min((i + 1) * B, N) - 1] - geneLocs[(i - 1) * B]);
+		minGeneL = max(minGeneL, (i == n - 1 ? geneLocs[N - 1] + 1e-6 : geneLocs[(i + 1) * B - 1]) - geneLocs[(i - 1) * B]);
 	}
 
 	return 0;
 }
 
+template <>
+inline void StrideQuery<unsigned long long>::refine(int s_seg, int e_seg, int hap, int *start, int *end) {
+	if (s_seg > -1) *start = (s_seg + 1) * B - __builtin_ctzll(x[M][s_seg] ^ x[hap][s_seg]);
+	else *start = 0;
+	if (e_seg < n) *end = e_seg * B + __builtin_clzll(x[M][e_seg] ^ x[hap][e_seg]);
+	else *end = N;
+}
+
+template <>
+inline void StrideQuery<unsigned __int128>::refine(int s_seg, int e_seg, int hap, int *start, int *end) {
+	if (s_seg > -1) {
+		unsigned long long right = x[M][s_seg] ^ x[hap][s_seg];
+		if (right == 0) {
+			*start = (s_seg + 1) * B - 64 - __builtin_ctzll((x[M][s_seg] >> 64) ^ (x[hap][s_seg] >> 64));
+		} else {
+			*start = (s_seg + 1) * B - __builtin_ctzll(right);
+		}
+	} else *start = 0;
+	if (e_seg < n) {
+		unsigned long long left = (x[M][e_seg] >> 64) ^ (x[hap][e_seg] >> 64);
+		if (left == 0) {
+			*end = e_seg * B + 64 + __builtin_clzll(x[M][e_seg] ^ x[hap][e_seg]);
+		} else {
+			*end = e_seg * B + __builtin_clzll(left);
+		}
+	} else *end = N;
+}
+
 template<class T>
 template<class U>
-int SparseQuery<T>::query(const char* query_file, const char* output_dir, const U L, const vector<U> &locs) { // variably distributed site locations
+int StrideQuery<T>::query(const char* query_file, const char* output_file, const U L, const vector<U> &locs, bool inclusive) { // variably distributed site locations
 	if (sizeof(U) == sizeof(double)) {
 		if (minGeneL == -1) return 3;
 		if (L < minGeneL) return 4;
 	} else {
 		if (L < minPhysL) return 4;
 	}
-	if (access(output_dir, W_OK) != 0) return 2;
 	ifstream in(query_file);
 	if (in.fail()) return 1;
  
@@ -296,7 +344,7 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 	Q <<= 1;
 	vector<vector<T>> z(n, vector<T>(Q));
 
-	// read query panel; "site" will now refer to "sparse site"
+	// read query panel
 	for (int K = 0; K < N; K++) {
 		if (!getline(in, line)) return 5;
 		ss = stringstream(line);
@@ -312,10 +360,12 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 
 	unsigned __int128 lt, rt;
 
+	ofstream out(output_file);
+	if (out.fail()) return 2;
 	for (int q = 0; q < Q; q++) {
-		ofstream out(string(output_dir) + "/" + qIDs[q >> 1] + "-" + to_string(q & 1) + ".txt");
+		string qID = qIDs[q >> 1] + "-" + to_string(q & 1);
 
-		z[n - 1][q] <<= n * B - N; // pad last site with 0s
+		z[n - 1][q] <<= n * B - N; // pad last segment with 0s
 		for (int k = 0, kp1 = 1; k < n; k++, kp1++) {
 			x[M][k] = z[k][q]; // copy query into panel
 			hz[kp1] = ((unsigned __int128) hz[k] * xp[1]) % MOD;
@@ -327,22 +377,22 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 				x_copy >>= 1;
 			}
 		}
-		// up_end[k] = # matches (above the query) that end at site k, dn_end[k] = ... below ... (above/below refer to positions in a[k])
+		// up_end[k] = # matches (above the query) that end at segment k, dn_end[k] = ... below ... (above/below refer to positions in a[k])
 		memset(&up_end[1], 0, n * sizeof(int));
 		memset(&dn_end[1], 0, n * sizeof(int));
 
-		/* k = current site, kp1 = k+1, t = virtual location of z in a[k+1], req_idx = rightmost site that must fully match,
-		   up_beg = non-inclusive start site of above match, dn_beg = ... below ..., up_on = # ongoing above matches, dn_on = ... below ... */
+		/* k = current segment, kp1 = k+1, t = virtual location of z in a[k+1], req_idx = rightmost segment that must fully match,
+		   up_beg = non-inclusive start segment of above match, dn_beg = ... below ..., up_on = # ongoing above matches, dn_on = ... below ... */
 		for (int k = 0, kp1 = 1, t = 0, req_idx = 0, up_beg = -1, dn_beg = -1, up_on = 0, dn_on = 0; kp1 < n; k++, kp1++) {
-			// binary search for query's position in a[k+1], according to sorting by (value at site k, position in a[k])
+			// binary search for query's position in a[k+1], according to sorting by (value at segment k, position in a[k])
 			inv_a[k][M] = t;
 			t = lower_bound(a[kp1].begin(), a[kp1].end(), M, [&, k](int i, int j) {
 				if (x[i][k] != x[j][k]) return x[i][k] < x[j][k];
 				return inv_a[k][i] < inv_a[k][j];
 			}) - a[kp1].begin();
-			// increment req_idx to the rightmost index such that matching over [req_idx, k+1] is not long enough
-			/* the last individual site can be omitted from site k+1 here since a full match of site k+1
-			   means the match will have a chance to be detected next time, unless this is the last site */
+			/* increment req_idx until matching over segments [req_idx, k+1] is not enough.
+			   the last site can be omitted from segment k+1 here since a full match of segment k+1 means the
+			   match will have a chance to be detected at the next segment, unless this is the last segment */
 			U loc = locs[kp1 == n - 1 ? N - 1 : (kp1 + 1) * B - 2];
 			while (req_idx < k && loc - locs[req_idx * B] >= L) req_idx++;
 			if (req_idx == 0) continue; // no possible matches
@@ -355,7 +405,7 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 			if (up_on == 0 && t > 0) {
 				int above = a[kp1][t - 1];
 				if (dn_on > 0) touch = d[kp1][t] <= req_idx; // can use divergence value if there are ongoing matches below query
-				else if (x[M][req_idx] == x[above][req_idx]) { // otherwise use hashes to check for match over sites [req_idx, k]
+				else if (x[M][req_idx] == x[above][req_idx]) { // otherwise use hashes to check for match over segments [req_idx, k]
 					lt = hz[req_idx] < h[above][req_idx] ? MOD - h[above][req_idx] + hz[req_idx] : hz[req_idx] - h[above][req_idx];
 					rt = hz[kp1] < h[above][kp1] ? MOD - h[above][kp1] + hz[kp1] : hz[kp1] - h[above][kp1];
 					touch = lt * xp[kp1 - req_idx] % MOD == rt;
@@ -396,34 +446,14 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 					}
 					up_end[lo]++;
 
-					// refine to single-site match [start, end)
-					int start = 0, end = N, e_idx = lo;
-					if (B == 64) {
-						if (up_beg > -1) start = (up_beg + 1) * B - __builtin_ctzll(x[M][up_beg] ^ x[above][up_beg]);
-						if (e_idx < n) end = e_idx * B + __builtin_clzll(x[M][e_idx] ^ x[above][e_idx]);
-					} else {
-						if (up_beg > -1) {
-							unsigned long long right = x[M][up_beg] ^ x[above][up_beg];
-							if (right == 0) {
-								start = (up_beg + 1) * B - 64 - __builtin_ctzll((x[M][up_beg] >> 64) ^ (x[above][up_beg] >> 64));
-							} else {
-								start = (up_beg + 1) * B - __builtin_ctzll(right);
-							}
-						}
-						if (e_idx < n) {
-							unsigned long long left = (x[M][e_idx] >> 64) ^ (x[above][e_idx] >> 64);
-							if (left == 0) {
-								end = e_idx * B + 64 + __builtin_clzll(x[M][e_idx] ^ x[above][e_idx]);
-							} else {
-								end = e_idx * B + __builtin_clzll(left);
-							}
-						}
-					}
+					// refine site boundaries [start, end)
+					int start, end;
+					refine(up_beg, lo, above, &start, &end);
 
 					// report match if long
-					U len = locs[end - 1] - locs[start];
+					U len = locs[end - 1] - locs[start] + inclusive;
 					if (len >= L) {
-						out << start << '\t' << end << '\t' << IDs[above] << '\t' << len << '\n';
+						out << qID << '\t' << IDs[above] << '\t' << start << '\t' << end << '\t' << len << '\n';
 					}
 				}
 				up_on = t - p; // add new matches to ongoing match count
@@ -474,32 +504,12 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 					} 
 					dn_end[lo]++;
 
-					int start = 0, end = N, e_idx = lo;
-					if (B == 64) {
-						if (dn_beg > -1) start = (dn_beg + 1) * B - __builtin_ctzll(x[M][dn_beg] ^ x[below][dn_beg]);
-						if (e_idx < n) end = e_idx * B + __builtin_clzll(x[M][e_idx] ^ x[below][e_idx]);
-					} else {
-						if (dn_beg > -1) {
-							unsigned long long right = x[M][dn_beg] ^ x[below][dn_beg];
-							if (right == 0) {
-								start = (dn_beg + 1) * B - 64 - __builtin_ctzll((x[M][dn_beg] >> 64) ^ (x[below][dn_beg] >> 64));
-							} else {
-								start = (dn_beg + 1) * B - __builtin_ctzll(right);
-							}
-						}
-						if (e_idx < n) {
-							unsigned long long left = (x[M][e_idx] >> 64) ^ (x[below][e_idx] >> 64);
-							if (left == 0) {
-								end = e_idx * B + 64 + __builtin_clzll(x[M][e_idx] ^ x[below][e_idx]);
-							} else {
-								end = e_idx * B + __builtin_clzll(left);
-							}
-						}
-					}
+					int start, end;
+					refine(up_beg, lo, below, &start, &end);
 
-					U len = locs[end - 1] - locs[start];
+					U len = locs[end - 1] - locs[start] + inclusive;
 					if (len >= L) {
-						out << start << '\t' << end << '\t' << IDs[below] << '\t' << len << '\n';
+						out << qID << '\t' << IDs[below] << '\t' << start << '\t' << end << '\t' << len << '\n';
 					}
 				}
 				dn_on = p - t;
@@ -511,13 +521,12 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 }
 
 template<class T>
-int SparseQuery<T>::query(const char* query_file, const char* output_dir, const int L) { // 1-length sites
+int StrideQuery<T>::query(const char* query_file, const char* output_file, const int L) { // 1-length sites
 	if (L < minSiteL) return 4;
-	if (access(output_dir, W_OK) != 0) return 2; 
 	ifstream in(query_file);
         if (in.fail()) return 1;
 
-	const int l = (L - B + 1) / B; // min # sparse sites that must be covered by an L-site match
+	const int l = (L - B + 1) / B; // min # segments that must be covered by an L-site match
 	string line;
 	while (getline(in, line)) {
 		if (line.size() < 2u) return 5;
@@ -553,8 +562,10 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 
 	unsigned __int128 lt, rt;
 
+	ofstream out(output_file);
+	if (out.fail()) return 2;
 	for (int q = 0; q < Q; q++) {
-		ofstream out(string(output_dir) + "/" + qIDs[q >> 1] + "-" + to_string(q & 1) + ".txt");
+		string qID = qIDs[q >> 1] + "-" + to_string(q & 1);
 
 		z[n - 1][q] <<= n * B - N;
 		for (int k = 0, kp1 = 1; k < n; k++, kp1++) {
@@ -618,31 +629,11 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 					}
 					up_end[lo]++;
 
-					int start = 0, end = N, e_idx = lo;
-					if (B == 64) {
-						if (s_idx > -1) start = (s_idx + 1) * B - __builtin_ctzll(x[M][s_idx] ^ x[above][s_idx]);
-						if (e_idx < n) end = e_idx * B + __builtin_clzll(x[M][e_idx] ^ x[above][e_idx]);
-					} else {
-						if (s_idx > -1) {
-							unsigned long long right = x[M][s_idx] ^ x[above][s_idx];
-							if (right == 0) {
-								start = (s_idx + 1) * B - 64 - __builtin_ctzll((x[M][s_idx] >> 64) ^ (x[above][s_idx] >> 64));
-							} else {
-								start = (s_idx + 1) * B - __builtin_ctzll(right);
-							}
-						}
-						if (e_idx < n) {
-							unsigned long long left = (x[M][e_idx] >> 64) ^ (x[above][e_idx] >> 64);
-							if (left == 0) {
-								end = e_idx * B + 64 + __builtin_clzll(x[M][e_idx] ^ x[above][e_idx]);
-							} else {
-								end = e_idx * B + __builtin_clzll(left);
-							}
-						}
-					}
+					int start, end;
+					refine(s_idx, lo, above, &start, &end);
 
 					if (end - start >= L) {
-						out << start << '\t' << end << '\t' << IDs[above] << '\n';
+						out << qID << '\t' << IDs[above] << '\t' << start << '\t' << end << '\n';
 					}
 				}
 				up_on = t - p;
@@ -684,31 +675,11 @@ int SparseQuery<T>::query(const char* query_file, const char* output_dir, const 
 					} 
 					dn_end[lo]++;
 
-					int start = 0, end = N, e_idx = lo;
-					if (B == 64) {
-						if (s_idx > -1) start = (s_idx + 1) * B - __builtin_ctzll(x[M][s_idx] ^ x[below][s_idx]);
-						if (e_idx < n) end = e_idx * B + __builtin_clzll(x[M][e_idx] ^ x[below][e_idx]);
-					} else {
-						if (s_idx > -1) {
-							unsigned long long right = x[M][s_idx] ^ x[below][s_idx];
-							if (right == 0) {
-								start = (s_idx + 1) * B - 64 - __builtin_ctzll((x[M][s_idx] >> 64) ^ (x[below][s_idx] >> 64));
-							} else {
-								start = (s_idx + 1) * B - __builtin_ctzll(right);
-							}
-						}
-						if (e_idx < n) {
-							unsigned long long left = (x[M][e_idx] >> 64) ^ (x[below][e_idx] >> 64);
-							if (left == 0) {
-								end = e_idx * B + 64 + __builtin_clzll(x[M][e_idx] ^ x[below][e_idx]);
-							} else {
-								end = e_idx * B + __builtin_clzll(left);
-							}
-						}
-					}
+					int start, end;
+					refine(s_idx, lo, below, &start, &end);
 
 					if (end - start >= L) {
-						out << start << '\t' << end << '\t' << IDs[below] << '\n';
+						out << qID << '\t' << IDs[below] << '\t' << start << '\t' << end << '\n';
 					}
 				}
 				dn_on = p - t;
