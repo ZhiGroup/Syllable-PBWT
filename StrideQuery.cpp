@@ -505,7 +505,7 @@ int StrideQuery<T>::query(const char* query_file, const char* output_file, const
 					dn_end[lo]++;
 
 					int start, end;
-					refine(up_beg, lo, below, &start, &end);
+					refine(dn_beg, lo, below, &start, &end);
 
 					U len = locs[end - 1] - locs[start] + inclusive;
 					if (len >= L) {

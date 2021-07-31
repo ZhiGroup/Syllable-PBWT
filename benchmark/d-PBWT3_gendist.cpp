@@ -125,9 +125,10 @@ int main(int argc, char** argv) {
 	q_in.close();
 
 	double L = stod(argv[4]);
-	string output_dir = argv[5];
+	ofstream out(argv[5]);
 	for (int q = 0; q < Q; q++) {
-		ofstream out(output_dir + "/" + qIDs[q >> 1] + "-" +  to_string(q & 1) + ".txt");
+		string qID = qIDs[q >> 1] + "-" +  to_string(q & 1);
+
 		t[0] = z[0][q] ? M : 0;
 		for (int i = 1; i < N; i++) {
 			if (z[i][q]) {
@@ -169,7 +170,7 @@ int main(int argc, char** argv) {
 			if (req_idx == 0) continue;
 
 			while (f_end < g_end) {
-				out << dz[a[i][f_end]] << '\t' << i << '\t' << IDs[a[i][f_end]] << '\t' << locs[i - 1] - locs[dz[a[i][f_end]]] << '\n';
+				out << qID << '\t' << IDs[a[i][f_end]] << '\t' << dz[a[i][f_end]] << '\t' << i << '\t' << locs[i - 1] - locs[dz[a[i][f_end]]] << '\n';
 				f_end++;
 			}
 
@@ -197,7 +198,7 @@ int main(int argc, char** argv) {
 		}
 
 		while (f < g) {
-			out << dz[a[N - 1][f]] << '\t' << N << '\t' << IDs[a[N - 1][f]] << '\t' << locs[N - 1] - locs[dz[a[N - 1][f]]] << '\n';
+			out << qID << '\t' << IDs[a[N - 1][f]] << '\t' << dz[a[N - 1][f]] << '\t' << N << '\t' << locs[N - 1] - locs[dz[a[N - 1][f]]] << '\n';
 			f++;
 		}
 	}

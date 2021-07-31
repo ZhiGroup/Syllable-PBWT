@@ -115,9 +115,9 @@ int main(int argc, char** argv) {
 	q_in.close();
 
 	int L = stoi(argv[3]);
-	string output_dir = argv[4];
+	ofstream out(argv[4]);
 	for (int q = 0; q < Q; q++) {
-		ofstream out(output_dir + "/" + qIDs[q >> 1] + "-" +  to_string(q & 1) + ".txt");
+		string qID = qIDs[q >> 1] + "-" +  to_string(q & 1);
 
 		t[0] = z[0][q] ? M : 0;
 		for (int i = 1; i < N; i++) {
@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
 			}
 
 			while (f_end < g_end) {
-				out << dz[a[i][f_end]] << '\t' << i << '\t' << IDs[a[i][f_end]] << '\n';
+				out << qID << '\t' << IDs[a[i][f_end]] << '\t' << dz[a[i][f_end]] << '\t' << i << '\n';
 				f_end++;
 			}
 
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 		}
 
 		while (f < g) {
-			out << dz[a[N - 1][f]] << '\t' << N << '\t' << IDs[a[N - 1][f]] << '\n';
+			out << qID << '\t' << IDs[a[N - 1][f]] << '\t' << dz[a[N - 1][f]] << '\t' << N << '\n';
 			f++;
 		}
 	}
