@@ -3,9 +3,10 @@
 #include <fstream>
 #include <math.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/stat.h>
 
-#include "StrideQuery.cpp"
+#include "SyllableQuery.cpp"
 
 using namespace std;
 
@@ -15,6 +16,11 @@ char *input_file, *load_file, *gen_map_file;
 int B{128};
 
 char *fifo_query;
+
+void signal_handler(int signum) {
+	unlink(fifo_query);
+	exit(signum);
+}
 
 void show_server_usage(string name) {
 	cout << "\nSpace-efficient long-match query algorithm.\n" <<
@@ -52,7 +58,7 @@ void output(int id, string s) {
 
 template<class T>
 void listen() {
-	StrideQuery<T> sq;
+	SyllableQuery<T> sq;
 
 	char *wdc = getcwd(NULL, 0);
 	string swd = string(wdc) + "/";
@@ -239,6 +245,8 @@ void listen() {
 }
 
 int main(int argc, char** argv) {
+	signal(SIGINT, signal_handler);
+
 	if (argc == 1) {
 		show_server_usage(argv[0]);
 		return 0;
