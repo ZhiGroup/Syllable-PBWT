@@ -23,13 +23,13 @@ void signal_handler(int signum) {
 }
 
 void show_server_usage(string name) {
-	cout << "\nSpace-efficient long-match query algorithm.\n" <<
+	cout << "Syllable-Query: space-efficient long-match query algorithm.\n" <<
 		"Server usage: " << name << " <flags>\n" <<
 		"Flags:\n" <<
 		"\t-h,--help                            Show this help message\n" <<
 		"\t-f,--fifo <FILE>                     File path to create named pipe for communication with clients\n" <<
 		"\t-i,--input_panel <FILE>              Path to VCF input file\n" <<
-		"\t-b,--bits <VALUE>                    Value of B (64 or 128; default: 128), the number of sites to be grouped into one segment\n" <<
+		"\t-b,--bits <VALUE>                    Value of B (64 or 128; default: 128), the number of sites to be grouped into one syllable\n" <<
 		"\t                                     A higher B leads to stricter minimum query lengths but improved space efficiency.\n" <<
 		"\t-s,--save                            Save panel data for fast loading when rerunning this program with --load\n" <<
 		"\t                                     You will be told the save file upon creation.\n" <<
