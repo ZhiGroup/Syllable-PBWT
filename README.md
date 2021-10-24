@@ -30,7 +30,7 @@ Our code allows multiple client users to query from one server program as long a
 | `-l <FILE>` or `--load <FILE>` | Path to load file | Must be the save file of a previous successful run |
 | `-g <FILE>` or `--gen_map <FILE>` | Path to genetic map file | The genetic map will be used when the query length unit is cM. Format: Sites described by one line each with genetic location as the last tab-delimited field. To accommodate header lines, lines with a non-numeric last field will be ignored. |
 
-The client program should be run with the server's named pipe (specified with `--fifo`) as the only parameter (you will be told so if you run `./client` with no parameters). When the server is done preprocessing, the client will be prompted with directions on how to query and the output format. Below are the flags used to query:
+The client program should be run with the server's named pipe (specified with `--fifo`) as the only parameter (you will be told so if you run `./client` with no parameters). When the server is done preprocessing, the client will be prompted with directions on how to query as well as the output format. Below are the flags used to query:
 |             Flag              |     Description         |
 |:-----------------------------:|:-----------------------:|
 | `-q <FILE>` or `--query_panel <FILE>` | Path to VCF query file |
@@ -50,4 +50,4 @@ and when prompted to enter a query, type
 
 `-q sample_data/sample_query.vcf -l 255`
 
-and then you will be told the file location of the match results.
+and then you will be told the file location of your match results.
