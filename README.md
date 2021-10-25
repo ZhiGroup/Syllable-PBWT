@@ -9,11 +9,11 @@ Syllable-PBWT is a space-efficient variation of the PBWT data structure introduc
 ## Installation
 Clone the repository:
 
-`git clone https://github.com/ZhiGroup/Syllable_PBWT`
+`git clone https://github.com/ZhiGroup/Syllable-PBWT`
 
 Enter the repository and compile the code:
 
-`cd Syllable_PBWT`
+`cd Syllable-PBWT`
 
 `make`
 
@@ -38,7 +38,7 @@ The client program should be run with the server's named pipe (specified with `-
 | `-u <STRING>` or `--units <STRING>` | Unit of query length: sites (default), cM, or bps |
 
 ## Sample Use
-The server and client programs are to be run from different terminals on the same host. In this example, we will use the data in the `sample_data` folder. On terminal 1, run
+The server and client programs are to be run from different terminals on the same host. In this example, we will use the data found in the `sample_data` folder. On terminal 1, run
 
 `./server -f fifo -i sample_data/sample_panel.vcf`
 
@@ -51,3 +51,6 @@ and when prompted to enter a query, type
 `-q sample_data/sample_query.vcf -l 255`
 
 and then you will be told the file location of your match results.
+
+## Benchmarking
+For reference, the `benchmark` folder includes our implementation for Algorithm 3 of [Sanaullah et al](https://academic.oup.com/bioinformatics/article/37/16/2390/6149123) against which we benchmarked Syllable-Query.
