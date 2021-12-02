@@ -69,9 +69,10 @@ int SyllableQuery<T>::precompute(const char* input_file) {
 		if ((K + 1) % B > 0) continue; // skip if not end of syllable
 
 		// coordinate-compress syllable values
-		r[k] = x_;
-		sort(r[k].begin(), r[k].end());
-		r[k].resize(unique(r[k].begin(), r[k].end()) - r[k].begin());
+		vector<T> x_copy = x_;
+		sort(x_copy.begin(), x_copy.end());
+		x_copy.resize(unique(x_copy.begin(), x_copy.end()) - x_copy.begin());
+		r[k] = x_copy;
 		for (int i = 0; i < M; i++) {
 			x[i][k] = lower_bound(r[k].begin(), r[k].end(), x_[i]) - r[k].begin();
 		}
