@@ -53,4 +53,15 @@ and when prompted to enter a query, type
 and then you will be told the file location of your match results.
 
 ## Benchmarking
-For reference, the `benchmark` folder includes our implementation for Algorithm 3 of [Sanaullah et al](https://academic.oup.com/bioinformatics/article/37/16/2390/6149123) against which we benchmarked Syllable-Query.
+For reference, the `benchmark` folder includes our implementation for Algorithm 3 of [Sanaullah et al.](https://academic.oup.com/bioinformatics/article/37/16/2390/6149123) against which we benchmarked Syllable-Query.
+
+## Citation
+If you found our work useful in your research, please consider citing the following paper:
+```
+@article{Syllable-PBWT,
+  author = {Wang, Victor and Naseri, Ardalan and Zhang, Shaojie and Zhi, Degui},
+  title = {{Syllable-PBWT for space-efficient haplotype long-match query}},
+  year = {2022},
+  doi = {10.1101/2022.01.31.478234}
+}
+```
