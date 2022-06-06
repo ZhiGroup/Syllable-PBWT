@@ -1,10 +1,10 @@
-#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <math.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "SyllableQuery.cpp"
 

@@ -1,0 +1,7 @@
+testing instructions:
+run call_select.sh to call select.cpp to select random haplotypes as queries and produce the main panel and query panel out of uk16
+run call_caller128.sh, call_caller64.sh, call_full.sh
+run call_stride.sh to call stride.cpp to select random haplotypes as queries and produce the main panel and query panel for each stride (1-6) of the 1000 genomes data
+run call_caller128N.sh, call_caller64N.sh, call_fullN.sh
+run call_prefix.sh to call prefix.cpp to select prefixes of uk1 and produce random query panel and main panel
+run call_caller128M.sh, call_caller64M.sh, call_fullM.sh
