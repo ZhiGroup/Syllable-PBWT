@@ -58,10 +58,18 @@ For reference, the `benchmark` folder includes our implementation for Algorithm 
 ## Citation
 If you found our work useful in your research, please consider citing the following paper:
 ```
-@article{Syllable-PBWT,
-  author = {Wang, Victor and Naseri, Ardalan and Zhang, Shaojie and Zhi, Degui},
-  title = {{Syllable-PBWT for space-efficient haplotype long-match query}},
-  year = {2022},
-  doi = {10.1101/2022.01.31.478234}
+@article{10.1093/bioinformatics/btac734,
+    author = {Wang, Victor and Naseri, Ardalan and Zhang, Shaojie and Zhi, Degui},
+    title = "{Syllable-PBWT for space-efficient haplotype long-match query}",
+    journal = {Bioinformatics},
+    volume = {39},
+    number = {1},
+    pages = {btac734},
+    year = {2022},
+    month = {11},
+    issn = {1367-4811},
+    doi = {10.1093/bioinformatics/btac734},
+    url = {https://doi.org/10.1093/bioinformatics/btac734},
+    eprint = {https://academic.oup.com/bioinformatics/article-pdf/39/1/btac734/48448727/btac734.pdf},
 }
 ```
