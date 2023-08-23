@@ -1,4 +1,5 @@
 #include "SyllableQuery.h"
+// This code is licensed under MIT license (see LICENSE for details)
 
 template<class T>
 int SyllableQuery<T>::precompute(const char* input_file) {
