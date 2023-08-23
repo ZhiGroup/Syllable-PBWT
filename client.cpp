@@ -1,3 +1,5 @@
+// This code is licensed under MIT license (see LICENSE for details)
+
 #include <iostream>
 #include <fcntl.h>
 #include <fstream>
